@@ -5,6 +5,10 @@ import { PasswordUI } from "@openauthjs/openauth/ui/password";
 import { createSubjects } from "@openauthjs/openauth/subject";
 import { object, string } from "valibot";
 
+const ALLOWED_CLIENTS = {
+	"vegvisr-app-auth": ["https://auth.vegvisr.org/callback"],
+};
+
 // This value should be shared between the OpenAuth server Worker and other
 // client Workers that you connect to it, so the types and schema validation are
 // consistent.
@@ -16,23 +20,28 @@ const subjects = createSubjects({
 
 export default {
 	fetch(request: Request, env: Env, ctx: ExecutionContext) {
-		// This top section is just for demo purposes. In a real setup another
-		// application would redirect the user to this Worker to be authenticated,
-		// and after signing in or registering the user would be redirected back to
-		// the application they came from. In our demo setup there is no other
-		// application, so this Worker needs to do the initial redirect and handle
-		// the callback redirect on completion.
 		const url = new URL(request.url);
+
+		if (url.pathname === "/authorize") {
+			const client = url.searchParams.get("client_id") ?? "";
+			const redirect = url.searchParams.get("redirect_uri") ?? "";
+			const allowed = ALLOWED_CLIENTS[client] ?? [];
+			if (!allowed.includes(redirect)) {
+				return new Response("unauthorized client/redirect", { status: 400 });
+			}
+		}
+
 		if (url.pathname === "/") {
-			url.searchParams.set("redirect_uri", url.origin + "/callback");
-			url.searchParams.set("client_id", "your-client-id");
+			url.searchParams.set("redirect_uri", "https://auth.vegvisr.org/callback");
+			url.searchParams.set("client_id", "vegvisr-app-auth");
 			url.searchParams.set("response_type", "code");
 			url.pathname = "/authorize";
 			return Response.redirect(url.toString());
-		} else if (url.pathname === "/callback") {
-			return Response.json({
-				message: "OAuth flow complete!",
-				params: Object.fromEntries(url.searchParams.entries()),
+		}
+
+		if (url.pathname === "/callback") {
+			return new Response("Callback is handled by your app worker", {
+				status: 400,
 			});
 		}
 
