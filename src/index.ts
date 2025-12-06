@@ -8,6 +8,8 @@ import { object, string } from "valibot";
 const DEFAULT_CLIENT_ID = "vegvisr-app-auth";
 const DEFAULT_REDIRECT = "https://auth.vegvisr.org/callback";
 
+const normalize = (uri: string) => uri.replace(/\/$/, "");
+
 const ALLOWED_CLIENTS: Record<string, string[]> = {
 	[DEFAULT_CLIENT_ID]: [
 		DEFAULT_REDIRECT,
@@ -77,7 +79,7 @@ export default {
 			const client = url.searchParams.get("client_id") ?? "";
 			const redirect = url.searchParams.get("redirect_uri") ?? "";
 			const allowed = ALLOWED_CLIENTS[client] ?? [];
-			if (!allowed.includes(redirect)) {
+			if (!allowed.map(normalize).includes(normalize(redirect))) {
 				return new Response("unauthorized client/redirect", { status: 400 });
 			}
 		}
@@ -131,6 +133,10 @@ export default {
 					light:
 						"https://imagedelivery.net/wSMYJvS3Xw-n339CbDyDIA/fa5a3023-7da9-466b-98a7-4ce01ee6c700/public",
 				},
+			},
+			allow: async ({ clientID, redirectURI }) => {
+				const allowed = ALLOWED_CLIENTS[clientID] ?? [];
+				return allowed.map(normalize).includes(normalize(redirectURI));
 			},
 			success: async (ctx: any, value: { email: string }) => {
 				return ctx.subject("user", {
